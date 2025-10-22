@@ -949,10 +949,10 @@ def main() -> int:
         if not args.no_open:
             print(f"🌐 Opening {out_path} in browser...", file=sys.stderr)
             webbrowser.open(str(out_path.resolve().as_uri()))
-            
+
             # Wait for browser to load the file before deleting
-            time.sleep(2)
-            
+            time.sleep(10)
+
             # Remove the HTML file after browser has loaded it
             try:
                 out_path.unlink()
