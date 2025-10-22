@@ -17,7 +17,7 @@ uv tool install git+https://github.com/bmanczak/renderchat
 Or manually:
 
 ```bash
-git clone https://github.com/yourusername/renderchat
+git clone https://github.com/bmanczak/renderchat
 cd renderchat
 uv pip install -e .
 ```
@@ -31,7 +31,7 @@ You get the URL of a conversation by clicking the "Share" button in chatgpt or c
 **ChatGPT:**
 
 ```bash
-renderchat https://chatgpt.com/share/68f76060-fdd0-8002-bf45-16e3f47ed656
+renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f
 ```
 
 **Claude:**
