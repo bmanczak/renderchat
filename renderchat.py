@@ -893,8 +893,8 @@ def build_html(url: str, messages: List[Message], platform_name: str = "ChatGPT"
 
   <div class="view-toggle">
     <strong>View:</strong>
-    <button class="toggle-btn active" onclick="showHumanView()">👤 Human</button>
-    <button class="toggle-btn" onclick="showLLMView()">🤖 LLM</button>
+    <button class="toggle-btn active" onclick="showHumanView(this)">👤 Human</button>
+    <button class="toggle-btn" onclick="showLLMView(this)">🤖 LLM</button>
   </div>
 
   <div id="human-view">
@@ -913,18 +913,18 @@ def build_html(url: str, messages: List[Message], platform_name: str = "ChatGPT"
 </div>
 
 <script>
-function showHumanView() {{
+function showHumanView(btn) {{
   document.getElementById('human-view').style.display = 'block';
   document.getElementById('llm-view').style.display = 'none';
-  document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 }}
 
-function showLLMView() {{
+function showLLMView(btn) {{
   document.getElementById('human-view').style.display = 'none';
   document.getElementById('llm-view').style.display = 'block';
-  document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 
   // Auto-select all text when switching to LLM view for easy copying
   setTimeout(() => {{
