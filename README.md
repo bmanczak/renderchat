@@ -37,7 +37,7 @@ renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f
 **Claude:**
 
 ```bash
-renderchat https://claude.ai/share/a70845ae-86cf-426a-a325-269dfdaf644b
+renderchat https://claude.ai/share/a110df84-4c35-4865-8587-e95ed13ae3fb
 ```
 
 The tool will:
