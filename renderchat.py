@@ -47,18 +47,17 @@ def ensure_firefox_installed() -> None:
     Raises:
         RuntimeError: If installation fails
     """
-    # Check if Firefox is already installed
+    # Check if Firefox is already installed by verifying the executable exists
+    executable_path = None
     try:
-        from playwright.sync_api import sync_playwright
-
         with sync_playwright() as p:
-            try:
-                p.firefox.executable_path
-                return  # Already installed
-            except Exception:
-                pass  # Not installed, continue
+            executable_path = getattr(p.firefox, "executable_path", None)
     except Exception:
-        pass  # Can't check, proceed with installation
+        # If Playwright driver isn't ready yet, we'll attempt installation below
+        executable_path = None
+
+    if executable_path and pathlib.Path(executable_path).exists():
+        return
 
     print("📦 Installing Playwright Firefox browser (first time only)...", file=sys.stderr)
     try:
@@ -68,6 +67,10 @@ def ensure_firefox_installed() -> None:
             text=True,
             check=True,
         )
+        # Verify installation by re-checking the executable existence
+        with sync_playwright() as p:
+            installed_path = getattr(p.firefox, "executable_path", None)
+        assert installed_path and pathlib.Path(installed_path).exists(), "Firefox executable missing after install"
         print("✓ Firefox installed successfully", file=sys.stderr)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to install Firefox: {e.stderr}") from e
