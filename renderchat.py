@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import webbrowser
 from dataclasses import dataclass
 from typing import List
@@ -362,7 +363,7 @@ def fetch_conversation(url: str) -> List[Message]:
     with sync_playwright() as p:
         # Claude requires a more realistic browser setup
         if platform == "claude":
-            browser = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
+            browser = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 viewport={"width": 1920, "height": 1080},
@@ -948,8 +949,11 @@ def main() -> int:
         if not args.no_open:
             print(f"🌐 Opening {out_path} in browser...", file=sys.stderr)
             webbrowser.open(str(out_path.resolve().as_uri()))
-
-            # Remove the HTML file after opening in browser
+            
+            # Wait for browser to load the file before deleting
+            time.sleep(2)
+            
+            # Remove the HTML file after browser has loaded it
             try:
                 out_path.unlink()
                 print(f"🧹 Removed temporary file", file=sys.stderr)
