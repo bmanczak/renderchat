@@ -8,12 +8,12 @@ py-modules = ["renderchat"]
 [project]
 name = "renderchat"
 version = "0.1.0"
-description = "Render ChatGPT conversations into a single static HTML page with easy XML export"
+description = "Render ChatGPT or Claude conversations into a single static HTML page with easy XML export"
 readme = "README.md"
 license = {text = "0BSD"}
-# license = "0BSD"  # Alternative format if above causes issues
+
 authors = [
-    {name = "Blazej"},
+    {name = "Blazej Manczak"},
 ]
 requires-python = ">=3.10"
 dependencies = [
