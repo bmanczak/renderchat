@@ -39,33 +39,38 @@ class Message:
     content: str
 
 
-def ensure_chromium_installed() -> None:
+def ensure_firefox_installed() -> None:
     """
-    Ensure Playwright's chromium browser is installed.
+    Ensure Playwright's Firefox browser is installed.
     Auto-installs if not present.
 
     Raises:
         RuntimeError: If installation fails
     """
-    # Check if chromium is already installed
+    # Check if Firefox is already installed
     try:
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
-            # Try to get browser executable path
-            p.chromium.executable_path
-            return  # Already installed
+            try:
+                p.firefox.executable_path
+                return  # Already installed
+            except Exception:
+                pass  # Not installed, continue
     except Exception:
-        pass  # Not installed, continue to install
+        pass  # Can't check, proceed with installation
 
-    print("📦 Installing Playwright chromium browser (first time only)...", file=sys.stderr)
+    print("📦 Installing Playwright Firefox browser (first time only)...", file=sys.stderr)
     try:
         subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"], capture_output=True, text=True, check=True
+            [sys.executable, "-m", "playwright", "install", "firefox"],
+            capture_output=True,
+            text=True,
+            check=True,
         )
-        print("✓ Chromium installed successfully", file=sys.stderr)
+        print("✓ Firefox installed successfully", file=sys.stderr)
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to install chromium: {e.stderr}")
+        raise RuntimeError(f"Failed to install Firefox: {e.stderr}") from e
 
 
 def extract_claude_conversation(html_content: str) -> List[Message]:
@@ -355,32 +360,84 @@ def fetch_conversation(url: str) -> List[Message]:
         PlaywrightTimeout: If the page load times out
         ValueError: If conversation cannot be parsed or URL is invalid
     """
-    # Ensure chromium is installed before attempting to use it
-    ensure_chromium_installed()
+    # Ensure Firefox is installed before attempting to use it
+    ensure_firefox_installed()
 
     platform = detect_platform(url)
 
     with sync_playwright() as p:
-        # Claude requires a more realistic browser setup
-        if platform == "claude":
-            browser = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                viewport={"width": 1920, "height": 1080},
-            )
-            page = context.new_page()
-        else:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+        # Use Firefox with stealth configuration for both platforms
+        browser = p.firefox.launch(
+            headless=True,
+            firefox_user_prefs={
+                "dom.webdriver.enabled": False,
+                "useAutomationExtension": False,
+            },
+        )
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
+            viewport={"width": 1920, "height": 1080},
+            locale="en-US",
+            timezone_id="America/New_York",
+            extra_http_headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+            },
+        )
+        page = context.new_page()
+
+        # Add stealth script to mask automation
+        page.add_init_script(
+            """
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """
+        )
 
         try:
-            page.goto(url, timeout=60000)
+            page.goto(url, timeout=60000, wait_until="networkidle")
 
             # Wait for content based on platform
             if platform == "chatgpt":
                 page.wait_for_selector('[data-testid*="conversation"]', timeout=10000)
             else:  # claude
-                page.wait_for_timeout(5000)
+                # Check if we hit a Cloudflare challenge
+                try:
+                    page.wait_for_selector('text="Just a moment"', timeout=2000)
+                    print("⚠️  Cloudflare challenge detected, waiting up to 30s for it to complete...", file=sys.stderr)
+
+                    # Wait for challenge to complete (up to 30 seconds)
+                    for i in range(30):
+                        page.wait_for_timeout(1000)
+                        current_url = page.url
+                        content = page.content()
+
+                        # Check if we've passed the challenge
+                        if "Just a moment" not in content and "claude.ai" in current_url:
+                            print(f"✓ Cloudflare challenge passed after {i+1}s", file=sys.stderr)
+                            break
+
+                        if i == 29:
+                            raise ValueError(
+                                "Cloudflare challenge did not complete. "
+                                "Claude.ai is blocking automated access. "
+                                "Try accessing the URL in a regular browser first."
+                            )
+                except PlaywrightTimeout:
+                    # No Cloudflare challenge detected, continue normally
+                    pass
+
+                # Wait additional time for content to load
+                page.wait_for_timeout(3000)
 
             html_content = page.content()
 
@@ -936,7 +993,7 @@ def main() -> int:
             file=sys.stderr,
         )
 
-        print(f"🔨 Generating HTML...", file=sys.stderr)
+        print("🔨 Generating HTML...", file=sys.stderr)
         platform_name = "ChatGPT" if platform == "chatgpt" else "Claude"
         html_out = build_html(args.url, messages, platform_name)
 
@@ -956,7 +1013,7 @@ def main() -> int:
             # Remove the HTML file after browser has loaded it
             try:
                 out_path.unlink()
-                print(f"🧹 Removed temporary file", file=sys.stderr)
+                print("🧹 Removed temporary file", file=sys.stderr)
             except Exception:
                 pass  # Silently ignore if removal fails
 

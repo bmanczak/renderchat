@@ -22,7 +22,9 @@ cd renderchat
 uv pip install -e .
 ```
 
-The tool will automatically install Playwright's chromium browser on first run.
+The tool will automatically install Playwright's Firefox browser on first run.
+
+Firefox is used for both ChatGPT and Claude (better Cloudflare bypass than Chromium).
 
 ## Usage
 
@@ -63,7 +65,8 @@ Once open, you can toggle between two views:
 - **Copy-friendly** - one click to copy the entire conversation
 - **Responsive design** - works on mobile
 - **Search-friendly** - use Ctrl+F to find anything in the conversation
-- **Auto-setup** - Playwright chromium installs automatically on first run
+- **Auto-setup** - Playwright Firefox installs automatically on first run
+- **🛡️ Cloudflare bypass** - automatically handles Claude's bot protection
 
 ## Supported platforms
 
