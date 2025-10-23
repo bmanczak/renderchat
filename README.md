@@ -6,6 +6,10 @@ Given the URL of a ChatGPT or Claude shared conversation `renderchat` extracts t
 
 I built this bc I have conversations in chatgpt or claude that I want to use in other applications (e.g. Cursor) as context.
 
+## Demo
+
+<div style="position: relative; padding-bottom: 75.15657620041753%; height: 0;"><iframe src="https://www.loom.com/embed/acb40d73daa641c5a4beefd2ba81f678?sid=e33459eb-98c2-4102-891d-f7fa0f1eb8b1&speed=2.5" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>
+
 ## Installation
 
 Install directly from GitHub:
@@ -72,7 +76,6 @@ Once open, you can toggle between two views:
 
 - ✅ ChatGPT shared conversations (https://chatgpt.com/share/...)
 - ✅ Claude shared conversations (https://claude.ai/share/...)
-- 🚧 More platforms coming soon (Grok)
 
 ## License
 
