@@ -6,9 +6,7 @@ Given the URL of a ChatGPT, Claude, or Grok shared conversation, `renderchat` ex
 
 I built this bc I have conversations in chatgpt, claude, or grok that I want to use in other applications (e.g. Cursor) as context.
 
-## Demo
-
-[![Watch the demo](https://cdn.loom.com/sessions/thumbnails/acb40d73daa641c5a4beefd2ba81f678-with-play.gif)](https://www.loom.com/share/acb40d73daa641c5a4beefd2ba81f678?speed=2.5)
+[Here's](https://www.loom.com/share/acb40d73daa641c5a4beefd2ba81f678?speed=2.5) a 13 second demo of the tool in action 🤗
 
 ## Installation
 
