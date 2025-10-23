@@ -8,7 +8,7 @@ I built this bc I have conversations in chatgpt, claude, or grok that I want to 
 
 ## Demo
 
-<div style="position: relative; padding-bottom: 75.15657620041753%; height: 0;"><iframe src="https://www.loom.com/embed/acb40d73daa641c5a4beefd2ba81f678?sid=e33459eb-98c2-4102-891d-f7fa0f1eb8b1&speed=2.5" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>
+[![Watch the demo](https://cdn.loom.com/sessions/thumbnails/acb40d73daa641c5a4beefd2ba81f678-with-play.gif)](https://www.loom.com/share/acb40d73daa641c5a4beefd2ba81f678?speed=2.5)
 
 ## Installation
 
