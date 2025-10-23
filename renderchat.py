@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Render ChatGPT conversations into a single static HTML page with easy XML export.
+Render ChatGPT, Claude, or Grok conversations into a single static HTML page with easy XML export.
 """
 
 from __future__ import annotations
@@ -152,6 +152,87 @@ def extract_claude_conversation(html_content: str) -> List[Message]:
 
     if not messages:
         raise ValueError("Could not extract conversation data from Claude page")
+
+    return messages
+
+
+def extract_grok_conversation(html_content: str) -> List[Message]:
+    """
+    Extract conversation messages from Grok shared page HTML.
+
+    Args:
+        html_content: Rendered HTML content from the shared conversation page
+
+    Returns:
+        List of Message objects representing the conversation
+
+    Raises:
+        ValueError: If conversation data cannot be extracted
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+    messages = []
+
+    # Check for attachments/images in the conversation
+    # Grok uses 'inline-media-container' sections for images/attachments
+    # These are empty in shared conversations when media was present
+    media_containers = soup.find_all("section", class_=lambda x: x and "inline-media-container" in x if x else False)
+    has_hidden_attachments = any(not container.get_text().strip() for container in media_containers)
+
+    # Grok uses 'message-bubble' class for messages
+    # User messages have parent with 'items-end' (right-aligned)
+    # Assistant messages have parent with 'items-start' (left-aligned)
+    message_bubbles = soup.find_all("div", class_=lambda x: x and "message-bubble" in x if x else False)
+
+    added_attachment_note = False
+
+    for bubble in message_bubbles:
+        # Determine role based on parent's alignment classes
+        role = None
+        parent = bubble.parent
+        if parent:
+            parent_classes = parent.get("class", [])
+            if "items-end" in parent_classes:
+                role = "user"
+            elif "items-start" in parent_classes:
+                role = "assistant"
+
+        if not role:
+            continue
+
+        # Extract content
+        content_copy = BeautifulSoup(str(bubble), "html.parser")
+
+        # Remove UI elements
+        for button in content_copy.find_all("button"):
+            button.decompose()
+        for elem in content_copy.find_all(class_=lambda x: x and "copy" in str(x).lower() if x else False):
+            elem.decompose()
+
+        # Convert to markdown
+        markdown_text = md(
+            str(content_copy),
+            heading_style="ATX",
+            code_language="",
+            escape_asterisks=False,
+            escape_underscores=False,
+            escape_misc=False,
+        ).strip()
+
+        markdown_text = clean_markdown_code_blocks(markdown_text)
+
+        # Add attachment note to first user message if attachments are hidden
+        if has_hidden_attachments and role == "user" and not added_attachment_note:
+            markdown_text = (
+                "📎 **[Attachment Hidden]** *(Files/images are not included in shared conversations)*\n\n"
+                + markdown_text
+            )
+            added_attachment_note = True
+
+        if markdown_text:
+            messages.append(Message(role=role, content=markdown_text))
+
+    if not messages:
+        raise ValueError("Could not extract conversation data from Grok page")
 
     return messages
 
@@ -336,7 +417,7 @@ def detect_platform(url: str) -> str:
         url: The conversation URL
 
     Returns:
-        Platform name: 'chatgpt' or 'claude'
+        Platform name: 'chatgpt', 'claude', or 'grok'
 
     Raises:
         ValueError: If URL is not from a supported platform
@@ -345,16 +426,18 @@ def detect_platform(url: str) -> str:
         return "chatgpt"
     elif "claude.ai/share/" in url:
         return "claude"
+    elif "grok.com/share/" in url or "x.ai/share/" in url:
+        return "grok"
     else:
-        raise ValueError("URL must be from chatgpt.com/share/ or claude.ai/share/")
+        raise ValueError("URL must be from chatgpt.com/share/, claude.ai/share/, or grok.com/share/")
 
 
 def fetch_conversation(url: str) -> List[Message]:
     """
-    Fetch and parse a shared conversation from ChatGPT or Claude using Playwright.
+    Fetch and parse a shared conversation from ChatGPT, Claude, or Grok using Playwright.
 
     Args:
-        url: Shared conversation URL from chatgpt.com/share/ or claude.ai/share/
+        url: Shared conversation URL from chatgpt.com/share/, claude.ai/share/, or grok.com/share/
 
     Returns:
         List of Message objects
@@ -369,7 +452,7 @@ def fetch_conversation(url: str) -> List[Message]:
     platform = detect_platform(url)
 
     with sync_playwright() as p:
-        # Use Firefox with stealth configuration for both platforms
+        # Use Firefox with stealth configuration for all platforms
         browser = p.firefox.launch(
             headless=True,
             firefox_user_prefs={
@@ -412,6 +495,9 @@ def fetch_conversation(url: str) -> List[Message]:
             # Wait for content based on platform
             if platform == "chatgpt":
                 page.wait_for_selector('[data-testid*="conversation"]', timeout=10000)
+            elif platform == "grok":
+                # Wait for Grok content to load
+                page.wait_for_timeout(3000)
             else:  # claude
                 # Check if we hit a Cloudflare challenge
                 try:
@@ -450,8 +536,10 @@ def fetch_conversation(url: str) -> List[Message]:
     # Extract messages based on platform
     if platform == "chatgpt":
         return extract_conversation_from_html(html_content)
-    else:  # claude
+    elif platform == "claude":
         return extract_claude_conversation(html_content)
+    else:  # grok
+        return extract_grok_conversation(html_content)
 
 
 def render_markdown_with_code(text: str) -> str:
@@ -967,9 +1055,10 @@ def main() -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
-    ap = argparse.ArgumentParser(description="Render ChatGPT or Claude conversations to a single HTML page")
+    ap = argparse.ArgumentParser(description="Render ChatGPT, Claude, or Grok conversations to a single HTML page")
     ap.add_argument(
-        "url", help="Shared conversation URL (https://chatgpt.com/share/... or https://claude.ai/share/...)"
+        "url",
+        help="Shared conversation URL (https://chatgpt.com/share/..., https://claude.ai/share/..., or https://grok.com/share/...)",
     )
     ap.add_argument("-o", "--out", help="Output HTML file path (default: temporary file derived from conversation ID)")
     ap.add_argument("--no-open", action="store_true", help="Don't open the HTML file in browser after generation")
@@ -997,7 +1086,7 @@ def main() -> int:
         )
 
         print("🔨 Generating HTML...", file=sys.stderr)
-        platform_name = "ChatGPT" if platform == "chatgpt" else "Claude"
+        platform_name = {"chatgpt": "ChatGPT", "claude": "Claude", "grok": "Grok"}[platform]
         html_out = build_html(args.url, messages, platform_name)
 
         out_path = pathlib.Path(args.out)
