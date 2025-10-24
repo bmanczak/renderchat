@@ -12,7 +12,6 @@ import pathlib
 import re
 import subprocess
 import sys
-import tempfile
 import time
 import webbrowser
 from dataclasses import dataclass
@@ -1035,11 +1034,11 @@ def derive_output_path(url: str) -> pathlib.Path:
         url: The conversation URL
 
     Returns:
-        Path object for the output HTML file
+        Path object for the output HTML file in the current directory
     """
     # Detect platform for proper filename prefix
     platform = detect_platform(url)
-    
+
     # Extract conversation ID from URL
     match = re.search(r"/share/([a-f0-9-]+)", url)
     if match:
@@ -1048,7 +1047,7 @@ def derive_output_path(url: str) -> pathlib.Path:
     else:
         filename = f"{platform}_conversation.html"
 
-    return pathlib.Path(tempfile.gettempdir()) / filename
+    return pathlib.Path(filename)
 
 
 def main() -> int:
