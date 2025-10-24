@@ -1037,13 +1037,16 @@ def derive_output_path(url: str) -> pathlib.Path:
     Returns:
         Path object for the output HTML file
     """
+    # Detect platform for proper filename prefix
+    platform = detect_platform(url)
+    
     # Extract conversation ID from URL
     match = re.search(r"/share/([a-f0-9-]+)", url)
     if match:
         conv_id = match.group(1)[:12]  # Use first 12 chars
-        filename = f"chatgpt_{conv_id}.html"
+        filename = f"{platform}_{conv_id}.html"
     else:
-        filename = "chatgpt_conversation.html"
+        filename = f"{platform}_conversation.html"
 
     return pathlib.Path(tempfile.gettempdir()) / filename
 
