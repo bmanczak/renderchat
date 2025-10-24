@@ -598,6 +598,68 @@ def render_markdown_with_code(text: str) -> str:
     return str(soup)
 
 
+def count_turns(messages: List[Message]) -> int:
+    """
+    Count the number of conversation turns (user-assistant pairs).
+
+    A turn is defined as a user message followed by one or more assistant messages.
+
+    Args:
+        messages: List of conversation messages
+
+    Returns:
+        Number of complete turns in the conversation
+    """
+    turns = 0
+    i = 0
+    while i < len(messages):
+        # Look for user message
+        if messages[i].role == "user":
+            # Count this as a turn
+            turns += 1
+            i += 1
+            # Skip any following assistant messages (they're part of this turn)
+            while i < len(messages) and messages[i].role == "assistant":
+                i += 1
+        else:
+            # Skip assistant messages without a preceding user message
+            i += 1
+    return turns
+
+
+def filter_last_turns(messages: List[Message], n_turns: int) -> List[Message]:
+    """
+    Filter messages to keep only the last N conversation turns.
+
+    Args:
+        messages: List of all conversation messages
+        n_turns: Number of turns to keep from the end
+
+    Returns:
+        Filtered list containing last N turns
+
+    Raises:
+        ValueError: If n_turns is invalid
+    """
+    total_turns = count_turns(messages)
+    assert n_turns > 0, "Number of turns must be positive"
+    assert n_turns <= total_turns, f"Requested {n_turns} turns but conversation only has {total_turns} turns"
+
+    # Find the starting index for the last N turns
+    turns_seen = 0
+    start_idx = 0
+
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i].role == "user":
+            turns_seen += 1
+            if turns_seen == n_turns:
+                # Found the start of the Nth turn from the end
+                start_idx = i
+                break
+
+    return messages[start_idx:]
+
+
 def generate_xml_text(messages: List[Message]) -> str:
     """
     Generate XML format text for LLM consumption.
@@ -638,6 +700,20 @@ def build_html(url: str, messages: List[Message], platform_name: str = "ChatGPT"
 
     # Generate XML text for LLM view
     xml_text = generate_xml_text(messages)
+
+    # Generate XML for different turn counts for the dropdown
+    total_turns = count_turns(messages)
+    xml_data_by_turns = {"all": xml_text}
+    turn_options = []
+
+    for n in range(1, min(total_turns + 1, 11)):  # Limit to max 10 turn options
+        filtered_messages = filter_last_turns(messages, n)
+        xml_for_n_turns = generate_xml_text(filtered_messages)
+        xml_data_by_turns[str(n)] = xml_for_n_turns
+        turn_options.append((n, len(filtered_messages)))
+
+    # Create JavaScript object with escaped XML strings
+    xml_data_json = json.dumps(xml_data_by_turns)
 
     # Check if conversation contains attachment references
     has_attachments = any(
@@ -972,6 +1048,7 @@ def build_html(url: str, messages: List[Message], platform_name: str = "ChatGPT"
           <strong>Total messages:</strong> {len(messages)}
           · <strong>User:</strong> {sum(1 for m in messages if m.role == 'user')}
           · <strong>Assistant:</strong> {sum(1 for m in messages if m.role == 'assistant')}
+          · <strong>Turns:</strong> {count_turns(messages)}
         </div>
       </div>
     </div>
@@ -990,7 +1067,13 @@ def build_html(url: str, messages: List[Message], platform_name: str = "ChatGPT"
 
     <div id="llm-view">
       <h2>🤖 LLM View - XML Format</h2>
-      <p>Copy the text below and paste it to an LLM for analysis:</p>
+      <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+        <label for="turn-selector" style="font-weight: 500;">Show turns:</label>
+        <select id="turn-selector" onchange="updateXMLContent()" style="padding: 0.5rem; border: 1px solid #dadce0; border-radius: 6px; font-size: 0.9rem; cursor: pointer;">
+          <option value="all">All ({count_turns(messages)} turns, {len(messages)} messages)</option>
+          {"".join(f'<option value="{n}">Last {n} turn{"s" if n > 1 else ""} ({msg_count} messages)</option>' for n, msg_count in reversed(turn_options))}
+        </select>
+      </div>
       <textarea id="llm-text" readonly>{xml_text.replace('</textarea>', '&lt;/textarea&gt;')}</textarea>
       <div class="copy-hint">
         💡 <strong>Tip:</strong> Click in the text area and press Ctrl+A (Cmd+A on Mac) to select all, then Ctrl+C (Cmd+C) to copy.
@@ -1000,6 +1083,9 @@ def build_html(url: str, messages: List[Message], platform_name: str = "ChatGPT"
 </div>
 
 <script>
+// Store XML data for different turn counts
+const xmlData = {xml_data_json};
+
 function showHumanView(btn) {{
   document.getElementById('human-view').style.display = 'block';
   document.getElementById('llm-view').style.display = 'none';
@@ -1019,6 +1105,16 @@ function showLLMView(btn) {{
     textArea.focus();
     textArea.select();
   }}, 100);
+}}
+
+function updateXMLContent() {{
+  const selector = document.getElementById('turn-selector');
+  const textArea = document.getElementById('llm-text');
+  const selectedValue = selector.value;
+
+  if (xmlData[selectedValue]) {{
+    textArea.value = xmlData[selectedValue];
+  }}
 }}
 </script>
 </body>
@@ -1071,7 +1167,22 @@ def main() -> int:
         metavar="PATH",
         help="Save conversation as XML file. If no path specified, saves to {conversation_id}.xml in current directory",
     )
+    ap.add_argument(
+        "--last-turns",
+        type=int,
+        metavar="N",
+        help="Include only the last N conversation turns (user-assistant pairs) in saved XML. Requires --save-xml.",
+    )
     args = ap.parse_args()
+
+    # Validate arguments
+    if args.last_turns is not None:
+        if args.save_xml is None:
+            print("❌ Error: --last-turns requires --save-xml to be specified", file=sys.stderr)
+            return 1
+        if args.last_turns <= 0:
+            print("❌ Error: --last-turns must be a positive integer", file=sys.stderr)
+            return 1
 
     # Validate URL format
     try:
@@ -1096,7 +1207,28 @@ def main() -> int:
 
         # Save XML if requested
         if args.save_xml is not None:
-            xml_content = generate_xml_text(messages)
+            # Apply turn filter if specified
+            messages_for_xml = messages
+            if args.last_turns is not None:
+                try:
+                    total_turns = count_turns(messages)
+                    if args.last_turns > total_turns:
+                        print(
+                            f"❌ Error: Requested {args.last_turns} turns but conversation only has {total_turns} turns",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    messages_for_xml = filter_last_turns(messages, args.last_turns)
+                    print(
+                        f"📊 Filtered to last {args.last_turns} turn(s) "
+                        f"({len(messages_for_xml)} messages out of {len(messages)})",
+                        file=sys.stderr,
+                    )
+                except AssertionError as e:
+                    print(f"❌ Error: {e}", file=sys.stderr)
+                    return 1
+
+            xml_content = generate_xml_text(messages_for_xml)
             if args.save_xml == "":
                 # Default: save to {conversation_id}.xml in current directory
                 match = re.search(r"/share/([a-f0-9-]+)", args.url)

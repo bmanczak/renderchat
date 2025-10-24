@@ -10,7 +10,7 @@ I built this bc I have conversations in chatgpt, claude, or grok that I want to 
 
 ## Installation
 
-Install directly from GitHub:
+Install and use easily with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install git+https://github.com/bmanczak/renderchat
@@ -71,13 +71,19 @@ renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f --save
 
 # Save to custom path
 renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f --save-xml /path/to/conversation.xml
+
+# Save only the last 3 conversation turns (user-assistant pairs)
+renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f --save-xml --last-turns 3
 ```
+
+**What's a "turn"?** A turn is one user message plus the assistant's response. This is perfect for giving an LLM just the recent context without overwhelming it with the entire conversation history.
 
 This is particularly useful when you want to:
 
 - Programmatically access conversations for LLM context
 - Skip the HTML interface and go straight to XML
 - Integrate with automated workflows or agents
+- Extract only recent interactions for focused LLM analysis
 
 ## Features
 
