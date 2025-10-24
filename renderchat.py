@@ -1064,6 +1064,13 @@ def main() -> int:
     )
     ap.add_argument("-o", "--out", help="Output HTML file path (default: temporary file derived from conversation ID)")
     ap.add_argument("--no-open", action="store_true", help="Don't open the HTML file in browser after generation")
+    ap.add_argument(
+        "--save-xml",
+        nargs="?",
+        const="",
+        metavar="PATH",
+        help="Save conversation as XML file. If no path specified, saves to {conversation_id}.xml in current directory",
+    )
     args = ap.parse_args()
 
     # Validate URL format
@@ -1086,6 +1093,25 @@ def main() -> int:
             f"{sum(1 for m in messages if m.role == 'assistant')} assistant)",
             file=sys.stderr,
         )
+
+        # Save XML if requested
+        if args.save_xml is not None:
+            xml_content = generate_xml_text(messages)
+            if args.save_xml == "":
+                # Default: save to {conversation_id}.xml in current directory
+                match = re.search(r"/share/([a-f0-9-]+)", args.url)
+                if match:
+                    conv_id = match.group(1)[:12]
+                    xml_path = pathlib.Path(f"{conv_id}.xml")
+                else:
+                    xml_path = pathlib.Path("conversation.xml")
+            else:
+                xml_path = pathlib.Path(args.save_xml)
+
+            print(f"💾 Writing XML file: {xml_path.resolve()}", file=sys.stderr)
+            xml_path.write_text(xml_content, encoding="utf-8")
+            xml_size = xml_path.stat().st_size
+            print(f"✓ Wrote {xml_size:,} bytes to {xml_path}", file=sys.stderr)
 
         print("🔨 Generating HTML...", file=sys.stderr)
         platform_name = {"chatgpt": "ChatGPT", "claude": "Claude", "grok": "Grok"}[platform]

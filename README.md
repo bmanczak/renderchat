@@ -61,6 +61,24 @@ Once open, you can toggle between two views:
 - **👤 Human View**: Clean, readable conversation with markdown rendering and navigation
 - **🤖 LLM View**: XML-formatted conversation ready to paste into any LLM
 
+### Saving XML directly
+
+For agentic systems or direct LLM integration, you can save the conversation as XML:
+
+```bash
+# Save to default location ({conversation_id}.xml in current directory)
+renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f --save-xml
+
+# Save to custom path
+renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f --save-xml /path/to/conversation.xml
+```
+
+This is particularly useful when you want to:
+
+- Programmatically access conversations for LLM context
+- Skip the HTML interface and go straight to XML
+- Integrate with automated workflows or agents
+
 ## Features
 
 - **📑 Navigation sidebar** - jump to any message instantly
@@ -69,6 +87,7 @@ Once open, you can toggle between two views:
 - **Dual view modes** - toggle between Human and LLM views
   - **👤 Human View**: Pretty interface with conversation flow and markdown
   - **🤖 LLM View**: XML format - perfect for copying to any LLM for analysis
+- **💾 Direct XML export** - save conversations as XML files for agentic systems and automated workflows
 - **Smart parsing** - preserves all formatting and code structure
 - **Copy-friendly** - one click to copy the entire conversation
 - **Responsive design** - works on mobile
