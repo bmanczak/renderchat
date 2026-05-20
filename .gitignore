@@ -21,6 +21,4 @@ Thumbs.db
 
 # Testing
 Dockerfile
-test*.py
 uv.lock
-

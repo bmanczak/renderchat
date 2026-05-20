@@ -16,6 +16,7 @@ import time
 import webbrowser
 from dataclasses import dataclass
 from typing import List
+from urllib.parse import urlparse, urlunparse
 
 import markdown
 from bs4 import BeautifulSoup
@@ -408,6 +409,39 @@ def extract_conversation_from_html(html_content: str) -> List[Message]:
     return messages
 
 
+def normalize_conversation_url(url: str) -> str:
+    """
+    Normalize user-provided conversation URLs into fetchable shared URLs.
+
+    Args:
+        url: The conversation URL, with or without a URL scheme
+
+    Returns:
+        Normalized URL string
+    """
+    normalized = url.strip()
+    if not normalized:
+        return normalized
+
+    if normalized.startswith("//"):
+        normalized = f"https:{normalized}"
+    elif "://" not in normalized:
+        normalized = f"https://{normalized}"
+
+    parsed = urlparse(normalized)
+    host = (parsed.hostname or "").lower()
+
+    # ChatGPT often leaves users on /c/<id> after copying from the address bar,
+    # while the public renderer can fetch the equivalent /share/<id> URL.
+    if host in {"chatgpt.com", "www.chatgpt.com"}:
+        match = re.match(r"^/c/([^/?#]+)", parsed.path)
+        if match:
+            parsed = parsed._replace(path=f"/share/{match.group(1)}", query="", fragment="")
+            normalized = urlunparse(parsed)
+
+    return normalized
+
+
 def detect_platform(url: str) -> str:
     """
     Detect which platform the URL is from.
@@ -421,14 +455,23 @@ def detect_platform(url: str) -> str:
     Raises:
         ValueError: If URL is not from a supported platform
     """
-    if "chatgpt.com/share/" in url:
+    parsed = urlparse(normalize_conversation_url(url))
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = parsed.path
+
+    if host == "chatgpt.com" and path.startswith("/share/"):
         return "chatgpt"
-    elif "claude.ai/share/" in url:
+    elif host == "claude.ai" and path.startswith("/share/"):
         return "claude"
-    elif "grok.com/share/" in url or "x.ai/share/" in url:
+    elif host in {"grok.com", "x.ai"} and path.startswith("/share/"):
         return "grok"
     else:
-        raise ValueError("URL must be from chatgpt.com/share/, claude.ai/share/, or grok.com/share/")
+        raise ValueError(
+            "URL must be from chatgpt.com/share/ or chatgpt.com/c/, "
+            "claude.ai/share/, or grok.com/share/"
+        )
 
 
 def fetch_conversation(url: str) -> List[Message]:
@@ -493,7 +536,26 @@ def fetch_conversation(url: str) -> List[Message]:
 
             # Wait for content based on platform
             if platform == "chatgpt":
-                page.wait_for_selector('[data-testid*="conversation"]', timeout=10000)
+                try:
+                    page.wait_for_selector('[data-testid*="conversation"]', timeout=10000, state="attached")
+                except PlaywrightTimeout:
+                    current_url = page.url
+                    content = page.content()
+                    if (
+                        "/auth/" in current_url
+                        or current_url.rstrip("/") == "https://chatgpt.com"
+                        or "Log in to ChatGPT" in content
+                        or "Get started | ChatGPT" in content
+                    ):
+                        raise ValueError(
+                            "ChatGPT redirected away before the conversation loaded. "
+                            "This usually means the conversation is not publicly shared. "
+                            "Click Share in ChatGPT, create a public share link, and run renderchat with that URL."
+                        )
+
+                    # Some ChatGPT pages expose conversation data in scripts before
+                    # rendering turn nodes. Keep the content and let the parser try.
+                    page.wait_for_timeout(3000)
             elif platform == "grok":
                 # Wait for Grok content to load
                 page.wait_for_timeout(3000)
@@ -1136,9 +1198,9 @@ def derive_output_path(url: str) -> pathlib.Path:
     platform = detect_platform(url)
 
     # Extract conversation ID from URL
-    match = re.search(r"/share/([a-f0-9-]+)", url)
+    match = re.search(r"/share/([^/?#]+)", normalize_conversation_url(url))
     if match:
-        conv_id = match.group(1)[:12]  # Use first 12 chars
+        conv_id = re.sub(r"[^A-Za-z0-9_-]", "_", match.group(1))[:12]  # Use first 12 chars
         filename = f"{platform}_{conv_id}.html"
     else:
         filename = f"{platform}_conversation.html"
@@ -1156,7 +1218,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Render ChatGPT, Claude, or Grok conversations to a single HTML page")
     ap.add_argument(
         "url",
-        help="Shared conversation URL (https://chatgpt.com/share/..., https://claude.ai/share/..., or https://grok.com/share/...)",
+        help=(
+            "Conversation URL (https://chatgpt.com/share/..., https://chatgpt.com/c/..., "
+            "https://claude.ai/share/..., or https://grok.com/share/...)"
+        ),
     )
     ap.add_argument("-o", "--out", help="Output HTML file path (default: temporary file derived from conversation ID)")
     ap.add_argument("--no-open", action="store_true", help="Don't open the HTML file in browser after generation")
@@ -1186,6 +1251,7 @@ def main() -> int:
 
     # Validate URL format
     try:
+        args.url = normalize_conversation_url(args.url)
         platform = detect_platform(args.url)
     except ValueError as e:
         print(f"❌ Error: {e}", file=sys.stderr)
@@ -1231,9 +1297,9 @@ def main() -> int:
             xml_content = generate_xml_text(messages_for_xml)
             if args.save_xml == "":
                 # Default: save to {conversation_id}.xml in current directory
-                match = re.search(r"/share/([a-f0-9-]+)", args.url)
+                match = re.search(r"/share/([^/?#]+)", args.url)
                 if match:
-                    conv_id = match.group(1)[:12]
+                    conv_id = re.sub(r"[^A-Za-z0-9_-]", "_", match.group(1))[:12]
                     xml_path = pathlib.Path(f"{conv_id}.xml")
                 else:
                     xml_path = pathlib.Path("conversation.xml")

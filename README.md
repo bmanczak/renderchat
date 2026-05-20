@@ -31,11 +31,14 @@ Firefox is used for all platforms (better Cloudflare bypass than Chromium).
 ## Usage
 
 You get the URL of a conversation by clicking the "Share" button in chatgpt, claude, or grok and then copying the URL.
+For ChatGPT, `renderchat` also accepts conversation URLs copied from the address bar (`https://chatgpt.com/c/...`) and uses the matching shared URL automatically when that conversation has been shared.
 
 **ChatGPT:**
 
 ```bash
 renderchat https://chatgpt.com/share/68f8d065-e1a0-8002-bfad-cd20855d5c8f
+# This also works:
+renderchat https://chatgpt.com/c/68f8d065-e1a0-8002-bfad-cd20855d5c8f
 ```
 
 **Claude:**
@@ -103,7 +106,7 @@ This is particularly useful when you want to:
 
 ## Supported platforms
 
-- ✅ ChatGPT shared conversations (https://chatgpt.com/share/...)
+- ✅ ChatGPT shared conversations (https://chatgpt.com/share/...) and shared address-bar conversation URLs (https://chatgpt.com/c/...)
 - ✅ Claude shared conversations (https://claude.ai/share/...)
 - ✅ Grok shared conversations (https://grok.com/share/...)
 
